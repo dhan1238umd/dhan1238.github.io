@@ -4,12 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://api.fontshare.com/v2/css?f[]=sentient@400&f[]=gambarino@400&f[]=switzer@400,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://use.typekit.net/gil0flh.css">
 <title>My Pretty Article</title>
 <style>
   body {
     margin: 0;
     padding: 0;
-    font-family: 'Gambarino', serif;
+    font-family: "myriad-pro", sans-serif;
     background: #282828;
   }
   .container {
@@ -27,7 +28,122 @@
 
 <div class="container">
   <h1>My Pretty Article</h1>
-  <p>This is a sample article with rounded borders and a gradient background.</p>
+  <p>Regardless of who they root for, most fans of the NBA can agree that officiating is far from perfect. A seemingly winnable game can suddenly become out of reach after one or two bad calls. Early playoff exits and heartbreaking losses are often blamed on biased referees and what sour fanbases like to call "the script", just look at any social media platform after a close game.
+
+With all of that being said, do NBA referees really deserve the criticism they receive? Are things actually rigged for certain teams? The main focus of this project is to answer some of these questions with data from previous seasons. This tutorial will walk you through the entire data science pipeline, from data collection to machine learning, and by the end of it you should have a better understanding of the factors impacting the accuracy of NBA referees. If we can use a model to predict incorrect calls based on the primary official of a game, we may even be able to hold specific refs accountable or find out who is fit for the job.
+
+The tutorial will be separated into five main sections:
+
+Data Collection
+Data Processing
+Exploratory Analysis and Data Visualization
+Model Analysis, Hypothesis Testing, Machine Learning
+Insights
+
+Before we can start exploring our topic, we need to find a dataset to work with. Since we want information related to foul calls, it makes the most sense to check the official NBA website for public data first. Luckily, the NBA has been publishing Last Two Minute Reports for every single game since the 2015-2016 season. An archive of these reports can be found here. As you may have guessed, Last Two Minute Reports assess the correctness of foul calls made within the last two minutes of a game and provide additional details such as the time left on the clock, the player who committed the foul, the player who was fouled, the type of foul called (technical, personal, defensive, blocking, etc.), and the review decision. There are four kinds of review decisions, CC = correct call, IC = incorrect call, CNC = correct non-call, and INC = incorrect non-call (a non-call is just a foul that cannot be challenged by a coach). For our purposes, an incorrect call is anything classified as an IC or INC. Some fans complain that the reports are useless as they do nothing to change game outcomes, but for data scientists, they are great! Unfortunately, the NBA does not provide the reports in .csv or spreadsheet format, so we will have to deal with that somehow.
+
+Now, we could build a webscraper and extract all of this data ourselves, or we could look around for existing datasets. With a bit of digging, we were able to find this handy website which has already scraped foul calls from every Last Two Minute Report from March 2015 to May 2024. Go ahead and download the .csv file available on the Github website. At this point, we can import the necessary Python libraries and start coding!
+
+If you are wondering what these libraries are for, here is a brief overview of the most important ones:
+
+Pandas is a popular open-source tool that can be used to organize and work with data in Python. The main data structure used in Pandas is called a dataframe, which you can think of as a simple group of columns and rows. Because they are easy to manipulate and understand, dataframes will be our structure of choice for the rest of the tutorial.
+NumPy is an extensive math library that we can use to perform fast operations on arrays. SciPy is similar to NumPy with greater emphasis on scientific computing.
+Matplot is a plotting library that we will use to create static visualizations like line graphs and histograms. Seaborn essentially serves the same purpose.
+The statsmodels.formula.api and Scikit-learn libraries are useful for running and evaluating machine learning algorithms or models.
+Also, if you are not familiar with Jupyter notebook you can read about the platform here.
+
+After using the Pandas read_csv() function to create a dataframe from the foul dataset (in my case the file is named foul_data_2015_2024.csv, but you can name it whatever you like), we can take a quick look at the data with the head() function. We will get into what each column represents in the next section. Every row represents a single foul call.
+
+While it is nice that the dataset has many different features to choose from, we only need a select few for analysis and visualization. Of the 50+ available columns, we will use the following:
+
+Date = self explanatory.
+Time = the amount of time left on the clock when the foul was called, in MINUTES:SECONDS.MILLISECONDS format.
+Season = the year.
+Home team = the name of the home team.
+Away team = the name of the away team.
+Type = the type of foul called.
+Committing = the name of the player who committed the foul.
+Disadvantaged = the name of the player who was fouled.
+Decision = the review decision for the foul, CC, CNC, IC, or INC.
+Committing team = the team of the player who committed the foul.
+Disadvantaged team = the team of the player who got fouled.
+Official 1 = the primary referee of the game in which the foul was called.
+In addition to filtering out these columns, we will rename some of them so they are a bit easier to work with and understand. Lastly we will use the map() function to change the player and opponent team columns so they match the home and away team columns. If you take a look at the player/opponent team and home/away team columns before the modification you will notice that their values do not follow the same format. The player/opponent teams use abbreviations instead of full names ("NYK" instead of "Knicks" for example).
+
+If there is any missing data (NaNs) in a row, we will drop it altogether. After cleaning up the dataframe, displaying foul_df_clean should look like the above block.
+
+We previously mentioned that incorrect calls include both IC and INC decisions. To make things easier later on, we will create another column, "correct decision", to numerically indicate the correctness of each foul call. Since a foul call can only be wrong or right, we will use ones for correct calls (when decision == CNC or CC) and zeros for incorrect calls (when decision == INC or IC).
+
+In the next code block we will also use the time column to create a new column containing the seconds remaining in a game.
+
+In this section, we are going to create a few different plots with our cleaned dataset and try to find some possible relationships between the variables. Feel free to recreate this part and try different graphs, the point of this stage is to experiment a bit!
+
+For the first graph, let's see how referees have performed over time by plotting the average foul call accuracy for each season. After grouping rows together by season using groupby(), the mean() function will allow us to quickly calculate the average value of the "correct decision" column for each group. This is basically the same as finding:
+ 
+
+After plotting with the Matplot library, you will notice that referees have *generally* gotten better over time. We will keep this in mind moving forward.
+
+To get a better idea of how biased (or unbiased) referees are, let's count the number of incorrect calls against each team. We can tell if a foul call puts a team at a disadvantage if the decision is incorrect, and if the player who got called for the foul is on that team. In the following code block, we will use nested Python dictionaries to map team names to the number of incorrect calls against them for every season.
+
+We might also want to know how many favorable calls each team gets every season. This is similar to what we did in the previous code block with some minor tweaks. In this case, the player who gets an incorrect foul call (and gains possession of the ball or gets to shoot free throws as a result) is considered favored. When it comes to implementing this, we will increment a team's favorable call count when the decision is incorrect and the player who got fouled, AKA the opponent, is on the current team.
+
+We may also expect the home and away teams to be treated differently every game, so let's go ahead and repeat what we did in the previous two blocks but for the home and away columns.
+
+Alright, this might seem like a lot, but we are almost at the finish line!
+
+Okay, now that we have counted up calls for every team across every season, we can use our data to plot incorrect and favorable call counts over time. We can also calculate the league average number of incorrect and favorable calls for every season using the mean() function once again. Follow the code below and take a look at the results, you might notice something interesting!
+
+Interestingly enough, there seems to be some significant team-level differences in call frequency. However, these trends shift quite a bit season-to-season. It may be hard to see, but take a look at the Nuggets number of favorable calls relative to the mean line. In 2023, the year they won the finals, the Nuggets were actually far above average in terms of their favorable calls. In contrast, the Warriors fell below the average number of favorable calls in 2022 when they won the championship over the Celtics. Thus we might not be able to make the generalization that some teams receive better treatment from the refs than other teams, but we can keep exploring other factors! If you want to feel better about the team you support, see how they compare to the rest of the league by making some minor changes to the code below.
+
+Since we already counted calls for the home and away team columns, we can plot them as well. Overall, the away team seems to be favored in most seasons: 2015-2016, 2018-2019, 2022-2023.
+
+Of course, not every referee is the same when it comes to accuracy, they aren't robots! To visualize this, we can count and plot the number of incorrect calls for every unique official listed in the dataset. This is not enough though, because some refs have not officiated as many games and therefore are less likely to get the same number of calls wrong as the more experienced referees. To combat this, we can also keep track of how many standard deviations away each referee is from the average accuracy (proportion of correct calls to total calls). Using this method will allow us to level the playing field a bit and analyze the performance of each referee. You might notice that there is quite a bit of variability in accuracy across officials. Interesting!
+
+The last two plots in this section are much easier to complete. To plot the frequency of incorrect calls as the number of seconds remaining decreases, we can just remove observations where the number of seconds is above 120, or 2 minutes. To plot the frequency of incorrect calls depending on the type of foul called, we can use the groupby() and mean() functions.
+
+Based on the charts, it seems like referees tend to get more calls wrong as game time decreases. This can be especially concerning for close games! Also, the correctness of calls appears to shift significantly across foul types, perhaps due to some calls being more common than others.
+
+At this stage of the data science pipeline, we will use a few well-known modeling and machine learning techniques to see how valid our assumptions are. To be more specific, we will train logistic regression and random forest models on our cleaned data and see how useful certain variables like official and remaining game time are for predicting incorrect foul calls. We will explain the different models later on, but first we have to prepare our dataset for training.
+
+We will use the same independent (predictors) and dependent (response) variables for both models. Independent: season, seconds remaining, foul type, official. Dependent: correct decision.
+
+If you try to split the dataset and train a model with it as-is, you will likely face some errors. This is because official names and foul types are represented as strings, which you cannot perform mathematical operations on! Fixing this is pretty simple with one-hot encoding, a method that converts categorical variables into unique sequences of 1s and 0s. For example, we can map the values [Cat, Dog, Fish] to [[1,0,0],[0,1,0 ],[0,0,1]]. If you want to learn more about one-hot encoding, you can read about it here. In Python, all we have to do is run the Pandas get_dummies() function to one hot encode the season, type, and official columns. Even though seasons are technically in numeric format, we will view them as categorical values.
+
+While we are at it, we can standardize the seconds column by calculating the mean and standard deviation, and using the formula:
+ 
+Standardization transforms the column so it has a mean of 0 and a standard deviation of 1. The objective of this is to fit the distribution of values to a standard normal distribution and reduce sensitivity to outliers (since the number of seconds remaining can vary quite a bit).
+
+Oh no, it looks like our dataset is imbalanced! Class imbalance occurs when the minority class, which is the correct decision == 0 in this case, appears far less than the majority class. There are over 12 times as many correct decisions as there are incorrect decisions. There are a few ways to deal with this, but the easiest solution is to pass a certain parameter when running our machine learning models (more on this soon). Before that, we can split our data into training and test sets with the train_test_split function.
+
+Split Data into Train and Test Splits
+
+Logistic regression models are used for predicting binary outcomes like incorrect and correct foul calls. It uses something known as the sigmoid function to produce a probability between 0 and 1 using our independent variables and calculated weights. This probability is used to make predictions based on a given threshold, typically 0.5. All we have to do is provide the LogisticRegression model with a number of iterations and a parameter, class_weight = "balanced", which indicates that our data is class-imbalanced. In the background, the model will use our training data to find the coefficients for our independent variables which best estimate the training outputs. Once the model is trained, we can assess its performance by making predictions on the test set with the predict() function. We can also see what the most impactful variables are by printing the top 5 largest coefficients. From this we can gather that SUPPORT RULING, OVERTURN RULING, and PERSONAL TAKE foul types have large impacts on results with small changes in data.
+
+To evaluate the model's performance, we can use the following metrics:
+
+Accuracy = the overall percentage of correct predictions.
+Precision = the percentage of positive predictions that are actually correct.
+Recall = the percentage of actual positives that are correctly identified.
+F1 = the harmonic mean of precision and recall.
+For visualization, we can plot a confusion matrix, which is a table showing the number of true/false positives and true/false negatives. A true positive is a correct prediction of the positive class, a false positive is an incorrect prediction of the positive class, a true negative is a correct prediction of the negative class, and a false negative is an incorrect prediction of the negative class. Our logistic regression seems to have a massive number of true positives compared to everything else, mostly because there are way more positive examples than negative examples in our dataset. To further reduce the effect of class imbalance, we might want to reduce the number of positive examples in our dataset or use some alternative methods like oversampling.
+
+Finally, we can plot a ROC curve that shows the tradeoff between the model's True Positive and False Positive Rates (TPR and FPR). Without going into too much detail, a curve that is closer to the top-left corner is generally considered to be better than a diagonal line. If the curve is a diagonal line, it means our model predictions are no better than random guesses. The area under the curve, or AUC, summarizes the performance of our model in a single value between 0 and 1. An AUC of 1 indicates a perfect model, and anything below 0.5 is worthless. Thankfully, we achieved an AUC of 0.69. Not perfect by any means, but not meaningless either! For more information on these metrics, go here.
+
+Let's move on and compare our logistic regression to a random forest model. The random forest classifier is an ensemble method that combines the predictions of multiple decision trees to produce a more accurate prediction than any decision tree on its own. Usually, the final prediction is made by taking the majority vote of the trees. Decision trees split input data into branches based on feature/predictor values, and come up with predictions at the leaf level. The variable used to split the data at any given node is determined through random feature selection, a process that randomly selects a subset of predictors (like official and seconds, or season and call type). You can learn about the model in more detail here.
+
+After calculating the same metrics, we can see a few things:
+
+The F1 score is higher than the logistic regression. This means the random forest model is better at predicting correct foul calls.
+The AUC is slightly lower than the logistic regression. This means the random forest model is slightly worse at distinguishing between incorrect and correct foul calls.
+The most important feature is not a specific call type, it is the number of seconds left in a game.
+
+This part of the data lifecycle is where we try to draw conclusions from our analysis and modeling. So, what have we learned here? Well, we can say a few things:
+
+Since 2015, referees have gotten better at making foul calls at the end of games.
+Some teams get more favorable calls than others, but this is not consistent across seasons.
+Accuracy among officials can vary drastically.
+Certain foul types get incorrectly called a lot more than others, like double technical fouls. This makes sense as technical fouls are quite subjective and can be swayed by the emotions of a referee.
+Foul calls get increasingly inaccurate as time expires. Time appears to be the most important feature when it comes to predicting the correctness of a foul call. Overall, it is safe to say that referees are not as bad as we might say they are. Although they get calls wrong, there are many factors outside of their control which make it difficult to not make mistakes. With that in mind, referees may still have biases that cannot be found in our dataset. For example, officials could treat star players better than benchwarmers, but there is no way of knowing that without having a player dataset on hand as well. The answers to our questions are still unclear, but we hope that you can take what you learned from this project to analyze other datasets!</p>
 </div>
 
 </body>
